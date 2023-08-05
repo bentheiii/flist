@@ -1,5 +1,3 @@
-MIT License
-
 Copyright (c) 2023 Ben Avrahami
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,3 +17,5 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Any machine learning, artificial intelligence, or other predictive software or program that is trained on software code (hereafter called the "AI Tool"), is prohibited from using any portion of the Software's source code in its model's training set (or tool-specific equivalent). This is unless the AI Tool's source code is distributed and made available to access and use, free of charge and without restriction. The AI Tool's source code must be in its entirety, and must include everything the AI Tool requires for to both function and maintenance (among others: tests, documentation, and machine learning models). The AI Tool's source code must be made available under such a license that it is at least as permissive as the license of this software.
