@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 
 use crate::config::Lock;
 
+#[derive(Debug, Clone)]
 pub struct LockFile {
-    path: Option<PathBuf>,
+    pub path: Option<PathBuf>,
 }
 
 impl LockFile {
@@ -30,7 +31,8 @@ impl LockFile {
 impl Drop for LockFile {
     fn drop(&mut self) {
         if let Some(path) = &self.path {
-            fs::remove_file(path).expect("Failed to remove lock file");
+            // we want to continue even if the file doesn't exist
+            let _ = fs::remove_file(path);
         }
     }
 }

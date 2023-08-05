@@ -6,10 +6,12 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, DisableMouseCapture, EnableMouseCapture};
+use crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+};
 use crossterm::execute;
 use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
 };
 use ratatui::backend::{Backend, CrosstermBackend};
 use ratatui::layout::{Constraint, Direction, Layout};
@@ -27,7 +29,13 @@ use self::open::open;
 pub fn main(project: Project, listener: TcpListener, lockfile: LockFile) {
     let mut stdout = io::stdout();
     enable_raw_mode().expect("Failed to enable raw mode");
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture, SetTitle("Flist")).expect("Failed to enter alternate screen");
+    execute!(
+        stdout,
+        EnterAlternateScreen,
+        EnableMouseCapture,
+        SetTitle("Flist")
+    )
+    .expect("Failed to enter alternate screen");
 
     let mut terminal =
         Terminal::new(CrosstermBackend::new(stdout)).expect("Failed to create terminal");
@@ -38,8 +46,12 @@ pub fn main(project: Project, listener: TcpListener, lockfile: LockFile) {
     let result = run_app(&mut terminal, app, tick_rate);
 
     disable_raw_mode().expect("Failed to disable raw mode");
-    execute!(terminal.backend_mut(), LeaveAlternateScreen,DisableMouseCapture)
-        .expect("Failed to leave alternate screen");
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )
+    .expect("Failed to leave alternate screen");
     terminal.show_cursor().expect("Failed to show cursor");
 
     result.expect("Failed to run app");
@@ -50,18 +62,19 @@ type PendingMessages = Arc<Mutex<Vec<ListenerMessages>>>;
 fn handle_stream(mut stream: TcpStream, pending_messages: PendingMessages) {
     let mut buffer = String::new();
     stream.read_to_string(&mut buffer).unwrap();
-    let request = serde_json::from_str::<RemoteRequest>(&buffer).unwrap();
+    if buffer.is_empty() {
+        return;
+    }
+    let Ok(request) = serde_json::from_str::<RemoteRequest>(&buffer) else {return;};
     pending_messages.lock().unwrap().push(request.into());
 }
 
 fn start_listener_thread(app: &App, listener: TcpListener) {
     let pending_messages = app.pending_messages.clone();
     std::thread::spawn(move || {
-        for stream in listener.incoming() {
-            if let Ok(stream) = stream {
-                let pending_messages = pending_messages.clone();
-                std::thread::spawn(move || handle_stream(stream, pending_messages));
-            }
+        for stream in listener.incoming().flatten() {
+            let pending_messages = pending_messages.clone();
+            std::thread::spawn(move || handle_stream(stream, pending_messages));
         }
     });
 }
@@ -160,26 +173,20 @@ impl SelectState {
                         code: KeyCode::Char('a'),
                         kind: KeyEventKind::Press,
                         ..
-                    }) if !project.archive.is_empty() => {
-                        OnEvent::without_saving(Self::Archive(0))
-                    }
+                    }) if !project.archive.is_empty() => OnEvent::without_saving(Self::Archive(0)),
                     Event::Key(KeyEvent {
                         code: KeyCode::Char('d'),
                         kind: KeyEventKind::Press,
                         ..
-                    }) if !project.entries.is_empty() => {
-                        OnEvent::without_saving(Self::Drag {
-                            dragged_entry_idx: selected_idx,
-                            new_position: selected_idx,
-                        })
-                    }
+                    }) if !project.entries.is_empty() => OnEvent::without_saving(Self::Drag {
+                        dragged_entry_idx: selected_idx,
+                        new_position: selected_idx,
+                    }),
                     Event::Key(KeyEvent {
                         code: KeyCode::Home,
                         kind: KeyEventKind::Press,
                         ..
-                    }) => {
-                        OnEvent::without_saving(Self::Entry(0))
-                    }
+                    }) => OnEvent::without_saving(Self::Entry(0)),
                     Event::Key(KeyEvent {
                         code: KeyCode::End,
                         kind: KeyEventKind::Press,
@@ -196,9 +203,7 @@ impl SelectState {
                         open(&entry.link);
                         OnEvent::ignore()
                     }
-                    _ => {
-                        OnEvent::ignore()
-                    }
+                    _ => OnEvent::ignore(),
                 }
             }
             Self::Archive(selected_idx) => {
@@ -236,9 +241,7 @@ impl SelectState {
                         code: KeyCode::Char('a'),
                         kind: KeyEventKind::Press,
                         ..
-                    }) => {
-                        OnEvent::without_saving(Self::Entry(0))
-                    }
+                    }) => OnEvent::without_saving(Self::Entry(0)),
                     Event::Key(KeyEvent {
                         code: KeyCode::Char('r'),
                         kind: KeyEventKind::Press,
@@ -251,16 +254,12 @@ impl SelectState {
                         code: KeyCode::Home,
                         kind: KeyEventKind::Press,
                         ..
-                    }) => {
-                        OnEvent::without_saving(Self::Archive(0))
-                    }
+                    }) => OnEvent::without_saving(Self::Archive(0)),
                     Event::Key(KeyEvent {
                         code: KeyCode::End,
                         kind: KeyEventKind::Press,
                         ..
-                    }) => {
-                        OnEvent::without_saving(Self::Archive(project.entries.len() - 1))
-                    }
+                    }) => OnEvent::without_saving(Self::Archive(project.entries.len() - 1)),
                     Event::Key(KeyEvent {
                         code: KeyCode::Enter,
                         kind: KeyEventKind::Press,
@@ -270,9 +269,7 @@ impl SelectState {
                         open(&entry.link);
                         OnEvent::ignore()
                     }
-                    _ => {
-                        OnEvent::ignore()
-                    }
+                    _ => OnEvent::ignore(),
                 }
             }
             Self::Drag {
@@ -286,12 +283,10 @@ impl SelectState {
                         code: KeyCode::Up,
                         kind: KeyEventKind::Press,
                         ..
-                    }) if new_position > 0 => {
-                        OnEvent::without_saving(Self::Drag {
-                            dragged_entry_idx,
-                            new_position: new_position - 1,
-                        })
-                    }
+                    }) if new_position > 0 => OnEvent::without_saving(Self::Drag {
+                        dragged_entry_idx,
+                        new_position: new_position - 1,
+                    }),
                     Event::Key(KeyEvent {
                         code: KeyCode::Down,
                         kind: KeyEventKind::Press,
@@ -306,22 +301,18 @@ impl SelectState {
                         code: KeyCode::Home,
                         kind: KeyEventKind::Press,
                         ..
-                    }) => {
-                        OnEvent::without_saving(Self::Drag {
-                            dragged_entry_idx,
-                            new_position: 0,
-                        })
-                    }
+                    }) => OnEvent::without_saving(Self::Drag {
+                        dragged_entry_idx,
+                        new_position: 0,
+                    }),
                     Event::Key(KeyEvent {
                         code: KeyCode::End,
                         kind: KeyEventKind::Press,
                         ..
-                    }) => {
-                        OnEvent::without_saving(Self::Drag {
-                            dragged_entry_idx,
-                            new_position: project.entries.len() - 1,
-                        })
-                    }
+                    }) => OnEvent::without_saving(Self::Drag {
+                        dragged_entry_idx,
+                        new_position: project.entries.len() - 1,
+                    }),
                     Event::Key(KeyEvent {
                         code: KeyCode::Enter,
                         kind: KeyEventKind::Press,
@@ -334,12 +325,8 @@ impl SelectState {
                         code: KeyCode::Esc,
                         kind: KeyEventKind::Press,
                         ..
-                    }) => {
-                        OnEvent::without_saving(Self::Entry(dragged_entry_idx))
-                    }
-                    _ => {
-                        OnEvent::ignore()
-                    }
+                    }) => OnEvent::without_saving(Self::Entry(dragged_entry_idx)),
+                    _ => OnEvent::ignore(),
                 }
             }
         }

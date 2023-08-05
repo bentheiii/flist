@@ -3,8 +3,10 @@ use clap::{Args, Parser, Subcommand};
 use std::fs;
 use std::fs::create_dir_all;
 use std::io::{BufWriter, Write};
-use std::net::TcpStream;
+use std::net::{IpAddr, SocketAddr, TcpStream};
 use std::path::PathBuf;
+use std::str::FromStr;
+use std::time::Duration;
 
 use crate::config::{self, FlistConfig, Lock, LockedWithoutListener};
 use crate::errors::LockedProject;
@@ -12,6 +14,7 @@ use crate::project::Project;
 use crate::requests::InsertRequest;
 
 const SECS_OF_GRACE_FOR_NONLISTENING_LOCK: u64 = 60;
+const LOCK_CONNECTION_TIMEOUT_MS: u64 = 250;
 
 #[derive(Debug)]
 pub struct ArgsApplyResult {
@@ -88,8 +91,12 @@ impl MainArgs {
                     .expect("failed to read lock file");
                     match lock {
                         Lock::WithListener(listener) => {
-                            let stream =
-                                TcpStream::connect((listener.hostname, listener.listener_port));
+                            let hostname = IpAddr::from_str(&listener.hostname)
+                                .expect("Failed to parse hostname");
+                            let stream = TcpStream::connect_timeout(
+                                &SocketAddr::from((hostname, listener.listener_port)),
+                                Duration::from_millis(LOCK_CONNECTION_TIMEOUT_MS),
+                            );
                             if let Ok(stream) = stream {
                                 return Err(LockedProject::WithListener(stream));
                             }
