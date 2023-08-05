@@ -13,6 +13,8 @@ This app should work on Windows, Linux and MacOS, but it has only been tested on
 ## Usage
 
 1. create a directory to store you project
-2. run `flist <directory> new --exit` to create a new project in the directory (if the flist executable is in the directory, you can just run `flist new --exit`)
-3. run `flist <directory>` to view the files in the project (if the flist executable is in the directory, you can just run `flist`)
-4. run `flist <directory> add <name> <link>` to add a file to the project (if the flist executable is in the directory, you can just run `flist add <name> <link>`)
+2. run `flist <directory> new --exit` to create a new project in the directory
+3. run `flist <directory>` to view the files in the project
+4. run `flist <directory> add <name> <link>` to add a file to the project
+
+The `<directory>` argument is optional, if not provided the current directory will be used.
