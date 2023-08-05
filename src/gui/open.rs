@@ -32,7 +32,7 @@ mod os {
 
 #[cfg(target_os = "linux")]
 mod os {
-    fn open_dir(link: &str) {
+    pub(super) fn open_dir(link: &str) {
         use std::process::Command;
         Command::new("xdg-open")
             .arg(link)
@@ -40,7 +40,7 @@ mod os {
             .expect("Failed to open explorer");
     }
 
-    fn open_select(link: &str) {
+    pub(super) fn open_select(link: &str) {
         use std::process::Command;
         Command::new("xdg-open")
             .arg("--select")
@@ -52,7 +52,7 @@ mod os {
 
 #[cfg(target_os = "macos")]
 mod os {
-    fn open_dir(link: &str) {
+    pub(super) fn open_dir(link: &str) {
         use std::process::Command;
         Command::new("open")
             .arg(link)
@@ -60,7 +60,7 @@ mod os {
             .expect("Failed to open explorer");
     }
 
-    fn open_select(link: &str) {
+    pub(super) fn open_select(link: &str) {
         use std::process::Command;
         Command::new("open")
             .arg("-R")
