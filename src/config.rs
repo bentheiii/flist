@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::requests::InsertRequest;
+use crate::{requests::InsertRequest, link::Link};
 
 pub const DEFAULT_MAX_ARCHIVE: usize = 100;
 
@@ -39,7 +39,7 @@ impl FlistConfig {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Entry {
     pub name: String,
-    pub link: String,
+    pub link: Link,
     pub time_added: DateTime<Utc>,
     pub metadata: Vec<String>,
 }

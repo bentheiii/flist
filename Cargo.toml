@@ -1,6 +1,6 @@
 [package]
 name = "flist"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Ben Avrahami"]
 
@@ -9,8 +9,12 @@ authors = ["Ben Avrahami"]
 [dependencies]
 chrono = { version = "0.4.26", features = ["serde"] }
 clap = { version = "4.3.19", features = ["derive"] }
+cli-clipboard = "0.4.0"
 crossterm = "0.26.1"
+open = "5.0.0"
 ratatui = { version = "0.22.0", features = ["all-widgets"] }
+reqwest = { version = "0.11.18", features = ["blocking"] }
+scraper = "0.17.1"
 serde = { version = "^1.0", features = ["derive"] }
 serde_json = "1.0.104"
 toml = "0.7.6"

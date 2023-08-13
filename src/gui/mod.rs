@@ -1,13 +1,12 @@
-mod open;
-
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::io::{self, Read};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crossterm::event::{
-    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
 };
 use crossterm::execute;
 use crossterm::terminal::{
@@ -20,11 +19,12 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 use ratatui::{Frame, Terminal};
 
+use crate::link::Link;
 use crate::lock::LockFile;
 use crate::project::Project;
 use crate::requests::{InsertRequest, RemoteRequest};
 
-use self::open::open;
+use cli_clipboard::{ClipboardContext, ClipboardProvider};
 
 pub fn main(project: Project, listener: TcpListener, lockfile: LockFile) {
     let mut stdout = io::stdout();
@@ -41,7 +41,7 @@ pub fn main(project: Project, listener: TcpListener, lockfile: LockFile) {
         Terminal::new(CrosstermBackend::new(stdout)).expect("Failed to create terminal");
 
     let tick_rate = Duration::from_millis(100);
-    let app = App::new(project, lockfile);
+    let app = App::new(project, lockfile, ClipboardContext::new().ok());
     start_listener_thread(&app, listener);
     let result = run_app(&mut terminal, app, tick_rate);
 
@@ -86,15 +86,17 @@ struct App {
     pending_messages: PendingMessages,
 
     select_state: SelectState,
+    clipboard: Option<RefCell<ClipboardContext>>,
 }
 
 impl App {
-    fn new(project: Project, lockfile: LockFile) -> Self {
+    fn new(project: Project, lockfile: LockFile, clipboard: Option<ClipboardContext>) -> Self {
         Self {
             project,
             _lockfile: lockfile,
             pending_messages: Arc::new(Mutex::new(Vec::new())),
             select_state: SelectState::Entry(0),
+            clipboard: clipboard.map(RefCell::new),
         }
     }
 
@@ -126,7 +128,7 @@ enum SelectState {
 }
 
 impl SelectState {
-    fn on_event(&self, event: Event, project: &mut Project) -> OnEvent {
+    fn on_event(&self, event: Event, project: &mut Project, clipboard: &Option<RefCell<ClipboardContext>>) -> OnEvent {
         if let Event::Key(KeyEvent {
             code: KeyCode::Char('q'),
             ..
@@ -200,8 +202,33 @@ impl SelectState {
                         ..
                     }) if !project.entries.is_empty() => {
                         let entry = &project.entries[selected_idx];
-                        open(&entry.link);
+                        entry.link.open();
                         OnEvent::ignore()
+                    }
+                    Event::Key(KeyEvent { code: KeyCode::Char('v'), modifiers: KeyModifiers::CONTROL, kind: KeyEventKind::Press, .. }) => {
+                        if let Some(clipboard) = &clipboard {
+                            if let Ok(contents) = clipboard.borrow_mut().get_contents() {
+                                let link = Link::from(contents.as_str());
+                                let name = link.infer_name();
+                                let request = InsertRequest {
+                                    name,
+                                    link,
+                                    metadata: Vec::new(),
+                                };
+                                let new_idx = if project.entries.is_empty() {
+                                    0
+                                } else {
+                                    selected_idx + 1
+                                };
+                                project.insert_entry_at(request.into(), new_idx);
+                                OnEvent::with_saving(Self::Entry(new_idx))
+                            } else {
+                                OnEvent::ignore()
+                            }
+                        } else {
+                            OnEvent::ignore()
+                        }
+
                     }
                     _ => OnEvent::ignore(),
                 }
@@ -266,7 +293,7 @@ impl SelectState {
                         ..
                     }) => {
                         let entry = &project.archive[selected_idx];
-                        open(&entry.link);
+                        entry.link.open();
                         OnEvent::ignore()
                     }
                     _ => OnEvent::ignore(),
@@ -332,17 +359,17 @@ impl SelectState {
         }
     }
 
-    fn get_options(&self, project: &Project) -> Vec<KeyOption> {
+    fn get_options(&self, app: &App) -> Vec<KeyOption> {
         let mut ret = Vec::new();
         match self {
             SelectState::Entry(selected_idx) => {
                 let selected_idx = *selected_idx;
-                if !project.entries.is_empty() {
+                if !app.project.entries.is_empty() {
                     ret.push(KeyOption::new("<Enter>", "open entry")); // todo
                     if selected_idx > 0 {
                         ret.push(KeyOption::new("<Up>", "select above entry"));
                     }
-                    if selected_idx < project.entries.len() - 1 {
+                    if selected_idx < app.project.entries.len() - 1 {
                         ret.push(KeyOption::new("<Down>", "select below entry"));
                     }
                     ret.push(KeyOption::new("<Home>", "select first entry"));
@@ -350,8 +377,13 @@ impl SelectState {
                     ret.push(KeyOption::new("<Delete>", "archive entry"));
                     ret.push(KeyOption::new("d", "drag entry"));
                 }
-                if !project.archive.is_empty() {
+                if !app.project.archive.is_empty() {
                     ret.push(KeyOption::new("a", "go to archive"));
+                }
+                if let Some(clipboard) = &app.clipboard {
+                    if clipboard.borrow_mut().get_contents().is_ok() {
+                        ret.push(KeyOption::new("^v", "paste clipboard"));
+                    }
                 }
             }
             SelectState::Archive(selected_idx) => {
@@ -360,7 +392,7 @@ impl SelectState {
                 if selected_idx > 0 {
                     ret.push(KeyOption::new("<Up>", "select above entry"));
                 }
-                if selected_idx < project.archive.len() - 1 {
+                if selected_idx < app.project.archive.len() - 1 {
                     ret.push(KeyOption::new("<Down>", "select below entry"));
                 }
                 ret.push(KeyOption::new("<Home>", "select first entry"));
@@ -375,7 +407,7 @@ impl SelectState {
                 if new_position > 0 {
                     ret.push(KeyOption::new("<Up>", "shift one up"));
                 }
-                if new_position < project.entries.len() - 1 {
+                if new_position < app.project.entries.len() - 1 {
                     ret.push(KeyOption::new("<Down>", "shift one down"));
                 }
                 ret.push(KeyOption::new("<Home>", "shift to top"));
@@ -483,7 +515,7 @@ fn run_app<B: Backend>(
         let timeout = tick_rate;
         if crossterm::event::poll(timeout)? {
             let ev = event::read()?;
-            let on_event = app.select_state.on_event(ev, &mut app.project);
+            let on_event = app.select_state.on_event(ev, &mut app.project, &app.clipboard);
             if on_event.save {
                 app.project.save();
             }
@@ -580,14 +612,14 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 Span::raw("]"),
             ]),
             Line::from(Span::raw("")),
-            Line::from(Span::raw(selected_entry.link.clone())),
+            Line::from(Span::raw(selected_entry.link.as_str())),
         ]);
         f.render_widget(entry_data, bottom_chunks[0]);
     }
 
     let key_options = app
         .select_state
-        .get_options(&app.project)
+        .get_options(&app)
         .into_iter()
         .map(|opt| opt.to_line())
         .collect::<Vec<_>>();

@@ -53,6 +53,10 @@ impl Project {
         self.entries.insert(0, entry)
     }
 
+    pub fn insert_entry_at(&mut self, entry: Entry, idx: usize) {
+        self.entries.insert(idx, entry)
+    }
+
     pub fn archive_entry(&mut self, entry_idx: usize) {
         let entry = self.entries.remove(entry_idx);
         self.archive.insert(0, entry);

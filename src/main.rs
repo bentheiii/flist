@@ -5,6 +5,7 @@ mod gui;
 mod lock;
 mod project;
 mod requests;
+mod link;
 
 use std::net::TcpListener;
 

@@ -1,4 +1,9 @@
 # Flint Changelog
+## 0.1.2
+### Added
+* url links are now supported
+* you can now paste a url or file path to add an entry to the list
+
 ## 0.1.1
 ## Fixed
 * fixed compilation for non-windows platforms
