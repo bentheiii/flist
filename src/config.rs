@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{requests::InsertRequest, link::Link};
+use crate::{link::Link, requests::InsertRequest};
 
 pub const DEFAULT_MAX_ARCHIVE: usize = 100;
 

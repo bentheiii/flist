@@ -6,7 +6,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crossterm::event::{
-    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+    KeyModifiers,
 };
 use crossterm::execute;
 use crossterm::terminal::{
@@ -128,7 +129,12 @@ enum SelectState {
 }
 
 impl SelectState {
-    fn on_event(&self, event: Event, project: &mut Project, clipboard: &Option<RefCell<ClipboardContext>>) -> OnEvent {
+    fn on_event(
+        &self,
+        event: Event,
+        project: &mut Project,
+        clipboard: &Option<RefCell<ClipboardContext>>,
+    ) -> OnEvent {
         if let Event::Key(KeyEvent {
             code: KeyCode::Char('q'),
             ..
@@ -205,7 +211,12 @@ impl SelectState {
                         entry.link.open();
                         OnEvent::ignore()
                     }
-                    Event::Key(KeyEvent { code: KeyCode::Char('v'), modifiers: KeyModifiers::CONTROL, kind: KeyEventKind::Press, .. }) => {
+                    Event::Key(KeyEvent {
+                        code: KeyCode::Char('v'),
+                        modifiers: KeyModifiers::CONTROL,
+                        kind: KeyEventKind::Press,
+                        ..
+                    }) => {
                         if let Some(clipboard) = &clipboard {
                             if let Ok(contents) = clipboard.borrow_mut().get_contents() {
                                 let link = Link::from(contents.as_str());
@@ -228,7 +239,6 @@ impl SelectState {
                         } else {
                             OnEvent::ignore()
                         }
-
                     }
                     _ => OnEvent::ignore(),
                 }
@@ -515,7 +525,9 @@ fn run_app<B: Backend>(
         let timeout = tick_rate;
         if crossterm::event::poll(timeout)? {
             let ev = event::read()?;
-            let on_event = app.select_state.on_event(ev, &mut app.project, &app.clipboard);
+            let on_event = app
+                .select_state
+                .on_event(ev, &mut app.project, &app.clipboard);
             if on_event.save {
                 app.project.save();
             }
@@ -619,7 +631,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let key_options = app
         .select_state
-        .get_options(&app)
+        .get_options(app)
         .into_iter()
         .map(|opt| opt.to_line())
         .collect::<Vec<_>>();

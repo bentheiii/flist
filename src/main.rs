@@ -2,10 +2,10 @@ mod args;
 mod config;
 mod errors;
 mod gui;
+mod link;
 mod lock;
 mod project;
 mod requests;
-mod link;
 
 use std::net::TcpListener;
 

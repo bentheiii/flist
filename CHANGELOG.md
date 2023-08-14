@@ -1,4 +1,7 @@
 # Flint Changelog
+## 0.1.3
+### Fixed
+* fixed directory and file path opening
 ## 0.1.2
 ### Added
 * url links are now supported
