@@ -1,7 +1,12 @@
-# Flint Changelog
+# Flist Changelog
+## 0.2.0
+### Added
+* added support for preferred file suffixes
+
 ## 0.1.3
 ### Fixed
 * fixed directory and file path opening
+
 ## 0.1.2
 ### Added
 * url links are now supported

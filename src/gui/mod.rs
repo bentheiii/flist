@@ -205,10 +205,22 @@ impl SelectState {
                     Event::Key(KeyEvent {
                         code: KeyCode::Enter,
                         kind: KeyEventKind::Press,
+                        modifiers,
                         ..
                     }) if !project.entries.is_empty() => {
                         let entry = &project.entries[selected_idx];
-                        entry.link.open();
+                        if modifiers.contains(KeyModifiers::CONTROL) {
+                            if let Ok(Some(pref)) = entry
+                                .link
+                                .preferred_file(project.config.preferred_suffixes.iter())
+                            {
+                                pref.open();
+                            } else {
+                                entry.link.explore()
+                            }
+                        } else {
+                            entry.link.explore()
+                        };
                         OnEvent::ignore()
                     }
                     Event::Key(KeyEvent {
@@ -300,10 +312,22 @@ impl SelectState {
                     Event::Key(KeyEvent {
                         code: KeyCode::Enter,
                         kind: KeyEventKind::Press,
+                        modifiers,
                         ..
-                    }) => {
+                    }) if !project.entries.is_empty() => {
                         let entry = &project.archive[selected_idx];
-                        entry.link.open();
+                        if modifiers.contains(KeyModifiers::CONTROL) {
+                            if let Ok(Some(pref)) = entry
+                                .link
+                                .preferred_file(project.config.preferred_suffixes.iter())
+                            {
+                                pref.open();
+                            } else {
+                                entry.link.explore()
+                            }
+                        } else {
+                            entry.link.explore()
+                        };
                         OnEvent::ignore()
                     }
                     _ => OnEvent::ignore(),
@@ -375,7 +399,18 @@ impl SelectState {
             SelectState::Entry(selected_idx) => {
                 let selected_idx = *selected_idx;
                 if !app.project.entries.is_empty() {
-                    ret.push(KeyOption::new("<Enter>", "open entry")); // todo
+                    ret.push(KeyOption::new("<Enter>", "open entry"));
+                    let entry = &app.project.entries[selected_idx];
+                    if let Ok(Some(pref)) = entry
+                        .link
+                        .preferred_file(app.project.config.preferred_suffixes.iter())
+                    {
+                        let desc = match &pref.extension {
+                            Some(ext) => format!("open .{} file", ext.to_uppercase()).into(),
+                            None => Cow::Borrowed("open preferred file"),
+                        };
+                        ret.push(KeyOption::new("<Ctrl+Enter>", desc));
+                    }
                     if selected_idx > 0 {
                         ret.push(KeyOption::new("<Up>", "select above entry"));
                     }
@@ -398,7 +433,18 @@ impl SelectState {
             }
             SelectState::Archive(selected_idx) => {
                 let selected_idx = *selected_idx;
-                ret.push(KeyOption::new("<Enter>", "open entry")); // todo
+                ret.push(KeyOption::new("<Enter>", "open entry"));
+                let entry = &app.project.archive[selected_idx];
+                if let Ok(Some(pref)) = entry
+                    .link
+                    .preferred_file(app.project.config.preferred_suffixes.iter())
+                {
+                    let desc = match &pref.extension {
+                        Some(ext) => format!("open .{} file", ext.to_uppercase()).into(),
+                        None => Cow::Borrowed("open preferred file"),
+                    };
+                    ret.push(KeyOption::new("<Ctrl+Enter>", desc));
+                }
                 if selected_idx > 0 {
                     ret.push(KeyOption::new("<Up>", "select above entry"));
                 }
@@ -432,19 +478,22 @@ impl SelectState {
 
 struct KeyOption {
     key: &'static str,
-    description: &'static str,
+    description: Cow<'static, str>,
 }
 
 impl KeyOption {
-    fn new(key: &'static str, description: &'static str) -> Self {
-        Self { key, description }
+    fn new(key: &'static str, description: impl Into<Cow<'static, str>>) -> Self {
+        Self {
+            key,
+            description: description.into(),
+        }
     }
 
     fn to_line(&self) -> Line<'static> {
         Line::from(vec![
             Span::styled(self.key, Style::default().add_modifier(Modifier::BOLD)),
             Span::raw("- "),
-            Span::raw(self.description),
+            Span::raw(self.description.clone()),
         ])
     }
 }
