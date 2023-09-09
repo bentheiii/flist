@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use std::io;
 use std::{path::Path, time::Duration};
 
+use itertools::Itertools;
 use std::process::Command;
 
 #[derive(Debug, Clone)]
@@ -45,9 +47,9 @@ impl Link {
         }
     }
 
-    pub fn open(&self) {
+    pub fn explore(&self) {
         match self {
-            Self::File(s) => Provider::new().open_file(s),
+            Self::File(s) => Provider::new().explore_at_file(s),
             Self::Directory(s) => Provider::new().open_dir(s),
             Self::Url(s) => Provider::new().open_url(s),
         }
@@ -58,6 +60,61 @@ impl Link {
             Self::File(s) => s.as_str(),
             Self::Directory(s) => s.as_str(),
             Self::Url(s) => s.as_str(),
+        }
+    }
+
+    pub fn preferred_file<'a>(
+        &self,
+        preffered_suffixes: impl IntoIterator<Item = &'a Vec<String>>,
+    ) -> io::Result<Option<PreferredFile>> {
+        match self {
+            Self::Directory(dir) => {
+                let suffixes = Path::new(dir)
+                    .read_dir()?
+                    .map(|f| f.map(|f| f.path()))
+                    .collect::<io::Result<Vec<_>>>()?
+                    .into_iter()
+                    .filter_map(|pth| {
+                        pth.extension()
+                            .and_then(|e| e.to_owned().into_string().ok())
+                            .map(|e| (e, pth))
+                    })
+                    .into_group_map();
+                for layer in preffered_suffixes {
+                    match layer
+                        .iter()
+                        .filter_map(|suffix| {
+                            suffixes
+                                .get(suffix)
+                                .map(|v| v.iter().map(move |p| (suffix, p)))
+                        })
+                        .flatten()
+                        .exactly_one()
+                    {
+                        Ok((suf, pth)) => {
+                            return Ok(Some(PreferredFile::new(
+                                Link::from(pth.to_str().unwrap()),
+                                Some(suf.clone()),
+                            )))
+                        }
+                        Err(mut remained) => {
+                            if remained.next().is_some() {
+                                break;
+                            } else {
+                                continue;
+                            }
+                        }
+                    }
+                }
+                Ok(None)
+            }
+            Self::File(_) => {
+                let ext = Path::new(self.as_str())
+                    .extension()
+                    .and_then(|e| e.to_owned().into_string().ok());
+                Ok(Some(PreferredFile::new(self.clone(), ext)))
+            }
+            _ => Ok(None),
         }
     }
 }
@@ -87,10 +144,29 @@ impl Serialize for Link {
 
 trait OsProvider {
     fn new() -> Self;
-    fn open_file(&self, link: &str);
+    fn open_file(&self, link: &str) {
+        open::that_detached(link).expect("Failed to open file");
+    }
+    fn explore_at_file(&self, link: &str);
     fn open_dir(&self, link: &str);
     fn open_url(&self, link: &str) {
         open::that_detached(link).expect("Failed to open browser");
+    }
+}
+
+#[derive(Debug)]
+pub struct PreferredFile {
+    pub file: Link,
+    pub extension: Option<String>,
+}
+
+impl PreferredFile {
+    fn new(file: Link, extension: Option<String>) -> Self {
+        Self { file, extension }
+    }
+
+    pub fn open(&self) {
+        Provider::new().open_file(self.file.as_str());
     }
 }
 
@@ -101,7 +177,7 @@ impl OsProvider for WindowsProvider {
         Self
     }
 
-    fn open_file(&self, link: &str) {
+    fn explore_at_file(&self, link: &str) {
         Command::new("explorer")
             .arg("/select,")
             .arg(link)
@@ -124,7 +200,7 @@ impl OsProvider for LinuxProvider {
         Self
     }
 
-    fn open_file(&self, link: &str) {
+    fn explore_at_file(&self, link: &str) {
         Command::new("xdg-open")
             .arg("--select")
             .arg(link)
@@ -147,7 +223,7 @@ impl OsProvider for MacProvider {
         Self
     }
 
-    fn open_file(&self, link: &str) {
+    fn explore_at_file(&self, link: &str) {
         Command::new("open")
             .arg("-R")
             .arg(link)

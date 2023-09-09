@@ -20,19 +20,25 @@ pub struct FlistConfig {
         skip_serializing_if = "is_default_max_archive"
     )]
     pub max_archive: usize,
+    #[serde(default = "Vec::new", skip_serializing_if = "Vec::is_empty")]
+    pub preferred_suffixes: Vec<Vec<String>>,
 }
 
 impl Default for FlistConfig {
     fn default() -> Self {
         Self {
             max_archive: default_max_archive(),
+            preferred_suffixes: Vec::new(),
         }
     }
 }
 
 impl FlistConfig {
-    pub fn new(max_archive: usize) -> Self {
-        Self { max_archive }
+    pub fn new(max_archive: usize, preferred_suffixes: Vec<Vec<String>>) -> Self {
+        Self {
+            max_archive,
+            preferred_suffixes,
+        }
     }
 }
 

@@ -65,8 +65,18 @@ impl MainArgs {
                     }
                     files_to_delete
                 };
-                let config =
-                    FlistConfig::new(new_args.max_archive.unwrap_or(config::DEFAULT_MAX_ARCHIVE));
+                let quick_launch = if let Some(quick_launch) = &new_args.quick_launch {
+                    quick_launch
+                        .split(',')
+                        .map(|layer| layer.split('|').map(|suffix| suffix.to_string()).collect())
+                        .collect()
+                } else {
+                    vec![]
+                };
+                let config = FlistConfig::new(
+                    new_args.max_archive.unwrap_or(config::DEFAULT_MAX_ARCHIVE),
+                    quick_launch,
+                );
 
                 fs::write(
                     config_path,
@@ -175,6 +185,9 @@ pub struct NewArgs {
     /// The maximum number of archives to keep.
     #[arg(short, long)]
     pub max_archive: Option<usize>,
+    /// The prefferred file suffixes for quick launch, each layer is seperated by a comma, each entry in a layer is seperated by a pipe.
+    #[arg(short, long)]
+    pub quick_launch: Option<String>,
     /// whether to overwrite an existing project.
     #[arg(short, long)]
     pub force: bool,
