@@ -1,4 +1,12 @@
 # Flist Changelog
+## 0.2.1
+### Fixed
+* fixed user agent for fetching web link titles
+### Internal
+* upgraded ratatui
+* upgraded crossterm
+* upgraded toml
+
 ## 0.2.0
 ### Added
 * added support for preferred file suffixes

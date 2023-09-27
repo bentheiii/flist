@@ -252,9 +252,14 @@ use reqwest::blocking::Client;
 use scraper::{Html, Selector};
 
 const INFER_TIMEOUT: Duration = Duration::from_millis(1000);
-const INFER_UA: &str = "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1667.0 Safari/537.36";
+const INFER_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36";
 
 fn get_url_title(url: &str) -> reqwest::Result<Option<String>> {
+    let title_selectors = vec![
+        Selector::parse("title").unwrap(),
+        Selector::parse("head > title").unwrap(),
+    ];
+
     let client = Client::builder()
         .user_agent(INFER_UA)
         .timeout(INFER_TIMEOUT)
@@ -266,7 +271,5 @@ fn get_url_title(url: &str) -> reqwest::Result<Option<String>> {
 
     let fragment = Html::parse_document(&body);
 
-    let selector = Selector::parse("title").unwrap();
-
-    Ok(fragment.select(&selector).next().map(|e| e.inner_html()))
+    Ok(title_selectors.iter().map(|s| fragment.select(s).map(|e| e.inner_html())).flatten().next())
 }
